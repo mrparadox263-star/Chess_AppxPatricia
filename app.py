@@ -8,7 +8,7 @@ import stat
 app = Flask(__name__)
 
 # Find the exact folder where app.py lives
-BASE_DIR = os.path.dirname(os.path.abspath(_file_))
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 if platform.system() == "Windows":
     ENGINE_PATH = os.path.join(BASE_DIR, "patricia.exe")
