@@ -19,6 +19,7 @@ else:
 
 # Start the engine
 engine = chess.engine.SimpleEngine.popen_uci(ENGINE_PATH)
+engine.configure({"Hash": 16, "Threads": 1})
 
 
 @app.route("/")
