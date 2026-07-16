@@ -253,8 +253,28 @@
         };
         board = Chessboard('board', config);
 
-        // Tap-to-move logic for mobile players
-        $(document).on('click', '.square-55d63', function() {
+// =========================================================
+        // Tap-to-move logic (Updated for Mobile Touch Overrides)
+        // =========================================================
+        var selectedSquare = null;
+        var touchMoved = false;
+        var lastTap = 0;
+
+        // Detect if the user is dragging a piece or scrolling the page
+        $(document).on('touchmove', function() { touchMoved = true; });
+        $(document).on('touchstart', function() { touchMoved = false; });
+
+        // Listen for BOTH desktop clicks and raw mobile touches
+        $(document).on('click touchend', '.square-55d63', function(e) {
+            
+            // Ignore if the user was dragging or scrolling
+            if (e.type === 'touchend' && touchMoved) return;
+            
+            // Prevent double-firing (phones trigger touchend and click simultaneously)
+            var timeNow = new Date().getTime();
+            if (timeNow - lastTap < 300) return;
+            lastTap = timeNow;
+
             var clickedSquare = $(this).attr('data-square');
             var isAnalysis = document.getElementById('analysis-mode').checked;
             
@@ -264,8 +284,7 @@
                 
                 // Only select if it's the current player's piece
                 if (piece && piece.color === game.turn()) {
-                    // Prevent selecting black pieces if not in analysis mode
-                    if (!isAnalysis && piece.color === 'b') return;
+                    if (!isAnalysis && piece.color === 'b') return; // Lock black pieces if not in analysis
 
                     selectedSquare = clickedSquare;
                     $('.square-55d63').removeClass('highlight-square');
@@ -293,7 +312,7 @@
                     return;
                 }
 
-                // Check if this move requires a promotion
+                // Check for pawn promotion
                 var pieceOnBoard = game.get(source);
                 var isPromotion = false;
 
@@ -313,13 +332,14 @@
                     }
                 }
 
+                // Attempt the move
                 var move = game.move({
                     from: source,
                     to: target,
                     promotion: promoPiece
                 });
                 
-                // Invalid move, clear selection
+                // Invalid move: clear selection
                 if (move === null) {
                     selectedSquare = null;
                     $('.square-55d63').removeClass('highlight-square');
@@ -332,7 +352,7 @@
                 $('.square-55d63').removeClass('highlight-square');
                 updateStatus();
                 
-                // Trigger the bot if playing against Patricia
+                // Trigger Patricia's API
                 if (!isAnalysis && !game.game_over()) {
                     $status.text("Patricia is thinking...");
                     var reqID = ++currentRequestID;
