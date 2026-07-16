@@ -13,7 +13,14 @@
         input[type="checkbox"] { transform: scale(1.2); margin-right: 5px; cursor: pointer; }
         label { cursor: pointer; margin-right: 15px; }
         #status { color: #f6f669; }
-        
+
+        .ad-container {
+            margin: 15px auto;
+            text-align: center;
+            min-height: 50px; /* Prevents the board from jumping around before the ad loads */
+            max-width: 100%;
+            overflow: hidden;
+         }
         /* Highlight the selected square for tap-to-move */
         .highlight-square {
             box-shadow: inset 0 0 5px 3px rgba(255, 255, 0, 0.6) !important;
@@ -23,6 +30,7 @@
 <body>
 
     <h2>Play Against Patricia</h2>
+    <div class="ad-container"> </div>
     <div id="board"></div>
 
     <div class="controls">
