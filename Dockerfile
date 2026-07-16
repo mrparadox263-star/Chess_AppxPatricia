@@ -15,7 +15,7 @@ WORKDIR /app
 COPY . .
 
 # Compile the Patricia engine using generic x86-64 architecture
-RUN make clean && make -B CXXFLAGS="-O3 -std=c++20 -ffast-math -march=x86-64"
+RUN make -B CXXFLAGS="-O3 -std=c++20 -ffast-math -march=x86-64"
 
 # Install your Python packages
 RUN pip install --no-cache-dir -r requirements.txt
