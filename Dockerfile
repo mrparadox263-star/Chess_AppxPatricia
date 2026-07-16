@@ -1,27 +1,32 @@
-# Start with a clean Linux environment that has Python installed
+# Start with a clean Linux environment
 FROM python:3.11-slim
 
-# Install the necessary C++ compilers (including clang) and build tools
+# Install C++ compilers, build tools, and Git
 RUN apt-get update && apt-get install -y \
     build-essential \
     make \
     clang \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
-# Create a workspace folder inside the container
+# Create our app workspace
 WORKDIR /app
 
-# Copy all your GitHub files (app.py, source code, .nnue files) into the container
+# Copy your web app files into the container
 COPY . .
 
-# Compile the Patricia engine using generic x86-64 architecture
-RUN make -B CXXFLAGS="-O3 -std=c++20 -ffast-math -march=x86-64"
+# Clone Patricia directly, compile it, and extract the engine and nets!
+RUN git clone https://github.com/Adam-Kulju/Patricia.git /tmp/patricia && \
+    cd /tmp/patricia/engine && \
+    make -B CXXFLAGS="-O3 -std=c++20 -ffast-math -march=x86-64" && \
+    cp patricia /app/patricia && \
+    cp -r nets /app/
 
-# Install your Python packages
+# Install Python requirements
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Grant execution permissions to the newly built binary
+# Grant execution permissions to the new binary
 RUN chmod +x patricia
 
-# Start the Flask web server using Gunicorn
+# Start the web server
 CMD gunicorn app:app --bind 0.0.0.0:$PORT
