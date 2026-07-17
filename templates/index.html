@@ -52,6 +52,24 @@
             background-color: #FFEA4C;
             transform: translateY(-2px);
         }
+        /* About Section CSS */
+        .about-section {
+            max-width: 600px;
+            margin: 40px auto;
+            padding: 20px;
+            background-color: #383531;
+            border-radius: 8px;
+            text-align: left;
+            line-height: 1.6;
+            color: #dddddd;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+        }
+        
+        .about-section h3 {
+            color: #f6f669;
+            margin-top: 0;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
@@ -104,7 +122,12 @@
             ☕ Buy Me a Coffee
         </a>
     </div>
-
+<!-- About Section for SEO and Context -->
+    <div class="about-section">
+        <h3>About the Patricia Engine</h3>
+        <p>Ever wondered what it's like to play against a neural network? This app lets you challenge Patricia, a powerful custom-compiled NNUE (Efficiently Updatable Neural Network) chess engine. Instead of relying purely on old-school brute-force calculations, Patricia evaluates positions using advanced AI architecture, making her play style incredibly sharp, dynamic, and surprisingly human.</p>
+        <p>I built this entire experience from the ground up to bring the engine directly to your browser. Under the hood, the raw C++ engine is hooked up to a custom Python Flask API, containerized with Docker, and optimized for seamless mobile and desktop play. Whether you are looking for a casual warmup at the 600 Elo beginner setting or a brutal tactical test at the 2400 Master level, the board is ready. Pick your color, dial in the difficulty, and see if you can outsmart the algorithm!</p>
+    </div>
     <h3 id="status">Your Turn</h3>
 
     <!-- Load jQuery, Chessboard.js, and Chess.js -->
