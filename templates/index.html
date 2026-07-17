@@ -46,6 +46,12 @@
 
     <div class="controls">
         <div class="control-row">
+            <label>Play as: </label>
+            <select id="color-select" onchange="resetGame()">
+                <option value="w" selected>White</option>
+                <option value="b">Black</option>
+            </select>
+            
             <label>Bot Elo: </label>
             <select id="elo-select">
                 <option value="600">600 (Beginner)</option>
