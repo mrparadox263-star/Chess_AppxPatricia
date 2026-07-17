@@ -82,17 +82,56 @@
         var board = null;
         var game = new Chess();
         var $status = $('#status');
-        var selectedSquare = null; // Tracks clicks for tap-to-move
-
+        var selectedSquare = null; 
+        var touchMoved = false;
+        var lastTap = 0;
         var currentRequestID = 0;
+
+        // Centralized bot API call to keep the code clean
+        function makeBotMove() {
+            $status.text("Patricia is thinking...");
+            var reqID = ++currentRequestID;
+            
+            fetch('/api/move', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    fen: game.fen(),
+                    elo: document.getElementById('elo-select').value
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (reqID !== currentRequestID) return;
+                
+                var uci = data.move; 
+                game.move({
+                    from: uci.substring(0, 2),
+                    to: uci.substring(2, 4),
+                    promotion: uci.length > 4 ? uci.substring(4, 5) : undefined
+                });
+                
+                board.position(game.fen());
+                updateStatus();
+            })
+            .catch(err => {
+                if (reqID === currentRequestID) $status.text("Error connecting to bot!");
+                console.error(err);
+            });
+        }
 
         function onDragStart (source, piece, position, orientation) {
             if (game.game_over()) return false;
 
             var isAnalysis = document.getElementById('analysis-mode').checked;
+            var playerColor = document.getElementById('color-select').value;
 
-            if (!isAnalysis && piece.search(/^b/) !== -1) {
-                return false;
+            // Prevent picking up the bot's pieces based on your chosen color
+            if (!isAnalysis) {
+                if ((playerColor === 'w' && piece.search(/^b/) !== -1) || 
+                    (playerColor === 'b' && piece.search(/^w/) !== -1)) {
+                    return false;
+                }
             }
         }
 
@@ -127,38 +166,8 @@
             updateStatus();
 
             var isAnalysis = document.getElementById('analysis-mode').checked;
-
             if (!isAnalysis && !game.game_over()) {
-                $status.text("Patricia is thinking...");
-
-                var reqID = ++currentRequestID;
-
-                fetch('/api/move', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        fen: game.fen(),
-                        elo: document.getElementById('elo-select').value
-                    })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (reqID !== currentRequestID) return;
-
-                    var uci = data.move; 
-                    game.move({
-                        from: uci.substring(0, 2),
-                        to: uci.substring(2, 4),
-                        promotion: uci.length > 4 ? uci.substring(4, 5) : undefined
-                    });
-
-                    board.position(game.fen());
-                    updateStatus();
-                })
-                .catch(err => {
-                    if (reqID === currentRequestID) $status.text("Error connecting to bot!");
-                    console.error(err);
-                });
+                makeBotMove();
             }
         }
 
@@ -176,10 +185,12 @@
             }
             else {
                 var isAnalysis = document.getElementById('analysis-mode').checked;
+                var playerColor = document.getElementById('color-select').value;
+                
                 if (isAnalysis) {
                     $status.text("Analysis Mode | " + moveColor + " to move");
                 } else {
-                    $status.text(moveColor === 'White' ? "Your Turn" : "Patricia is thinking...");
+                    $status.text(game.turn() === playerColor ? "Your Turn" : "Patricia is thinking...");
                 }
             }
         }
@@ -187,63 +198,32 @@
         function toggleAnalysis() {
             updateStatus();
             var isAnalysis = document.getElementById('analysis-mode').checked;
+            var playerColor = document.getElementById('color-select').value;
 
-            if (!isAnalysis && game.turn() === 'b' && !game.game_over()) {
-                $status.text("Patricia is thinking...");
-
-                var reqID = ++currentRequestID;
-
-                fetch('/api/move', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ fen: game.fen(), elo: document.getElementById('elo-select').value })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (reqID !== currentRequestID) return;
-
-                    var uci = data.move;
-                    game.move({
-                        from: uci.substring(0, 2),
-                        to: uci.substring(2, 4),
-                        promotion: uci.length > 4 ? uci.substring(4, 5) : undefined
-                    });
-
-                    board.position(game.fen());
-                    updateStatus();
-                });
+            // Trigger bot if we leave analysis mode and it's the bot's turn
+            if (!isAnalysis && !game.game_over() && game.turn() !== playerColor) {
+                makeBotMove();
             }
         }
 
         function undoMove() {
-            console.log("--- Undo Button Clicked ---");
-
             var isAnalysis = document.getElementById('analysis-mode').checked;
             currentRequestID++; // Kill pending bot moves
 
-            var historyCount = game.history().length;
-            console.log("Moves in history before undo: " + historyCount);
-
-            if (historyCount === 0) {
-                console.log("No moves to undo!");
-                return;
-            }
+            if (game.history().length === 0) return;
 
             if (isAnalysis) {
                 game.undo();
-                console.log("Analysis Mode: Undid 1 move.");
             } else {
                 game.undo();
-                console.log("Bot Mode: Undid most recent move.");
-
-                if (game.turn() === 'b' && game.history().length > 0) {
+                // If it is now the bot's turn, undo one more time to give control back to player
+                var playerColor = document.getElementById('color-select').value;
+                if (game.turn() !== playerColor && game.history().length > 0) {
                     game.undo();
-                    console.log("Bot Mode: Undid bot's move to return to your turn.");
                 }
             }
 
-            var newFen = game.fen();
-            board.position(newFen, false);
+            board.position(game.fen(), false);
             updateStatus();
         }
 
@@ -264,8 +244,19 @@
         function resetGame() {
             currentRequestID++;
             game.reset();
+            
+            // Check color preference and flip board accordingly
+            var playerColor = document.getElementById('color-select').value;
+            board.orientation(playerColor === 'w' ? 'white' : 'black');
             board.start();
+            
             updateStatus();
+            
+            // If playing as Black, trigger Patricia to make the opening move
+            var isAnalysis = document.getElementById('analysis-mode').checked;
+            if (!isAnalysis && playerColor === 'b') {
+                makeBotMove();
+            }
         }
 
         var config = {
@@ -278,57 +269,44 @@
         };
         board = Chessboard('board', config);
 
-// =========================================================
+        // =========================================================
         // Tap-to-move logic (Updated for Mobile Touch Overrides)
         // =========================================================
-        var selectedSquare = null;
-        var touchMoved = false;
-        var lastTap = 0;
-
-        // Detect if the user is dragging a piece or scrolling the page
         $(document).on('touchmove', function() { touchMoved = true; });
         $(document).on('touchstart', function() { touchMoved = false; });
 
-        // Listen for BOTH desktop clicks and raw mobile touches
         $(document).on('click touchend', '.square-55d63', function(e) {
-            
-            // Ignore if the user was dragging or scrolling
             if (e.type === 'touchend' && touchMoved) return;
             
-            // Prevent double-firing (phones trigger touchend and click simultaneously)
             var timeNow = new Date().getTime();
             if (timeNow - lastTap < 300) return;
             lastTap = timeNow;
 
             var clickedSquare = $(this).attr('data-square');
             var isAnalysis = document.getElementById('analysis-mode').checked;
+            var playerColor = document.getElementById('color-select').value;
             
-            // First tap: Select a piece
             if (selectedSquare === null) {
                 var piece = game.get(clickedSquare);
                 
-                // Only select if it's the current player's piece
                 if (piece && piece.color === game.turn()) {
-                    if (!isAnalysis && piece.color === 'b') return; // Lock black pieces if not in analysis
+                    if (!isAnalysis && piece.color !== playerColor) return; 
 
                     selectedSquare = clickedSquare;
                     $('.square-55d63').removeClass('highlight-square');
                     $(this).addClass('highlight-square');
                 }
             } 
-            // Second tap: Move piece to destination
             else {
                 var source = selectedSquare;
                 var target = clickedSquare;
                 
-                // Cancel if clicking the exact same square
                 if (source === target) {
                     selectedSquare = null;
                     $('.square-55d63').removeClass('highlight-square');
                     return;
                 }
                 
-                // Change selection if clicking another of your own pieces
                 var targetPiece = game.get(target);
                 if (targetPiece && targetPiece.color === game.turn()) {
                     selectedSquare = target;
@@ -337,7 +315,6 @@
                     return;
                 }
 
-                // Check for pawn promotion
                 var pieceOnBoard = game.get(source);
                 var isPromotion = false;
 
@@ -357,57 +334,21 @@
                     }
                 }
 
-                // Attempt the move
-                var move = game.move({
-                    from: source,
-                    to: target,
-                    promotion: promoPiece
-                });
+                var move = game.move({ from: source, to: target, promotion: promoPiece });
                 
-                // Invalid move: clear selection
                 if (move === null) {
                     selectedSquare = null;
                     $('.square-55d63').removeClass('highlight-square');
                     return;
                 }
                 
-                // Move is legal: Update board visually
                 board.position(game.fen());
                 selectedSquare = null;
                 $('.square-55d63').removeClass('highlight-square');
                 updateStatus();
                 
-                // Trigger Patricia's API
                 if (!isAnalysis && !game.game_over()) {
-                    $status.text("Patricia is thinking...");
-                    var reqID = ++currentRequestID;
-                    
-                    fetch('/api/move', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            fen: game.fen(),
-                            elo: document.getElementById('elo-select').value
-                        })
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (reqID !== currentRequestID) return;
-                        
-                        var uci = data.move; 
-                        game.move({
-                            from: uci.substring(0, 2),
-                            to: uci.substring(2, 4),
-                            promotion: uci.length > 4 ? uci.substring(4, 5) : undefined
-                        });
-                        
-                        board.position(game.fen());
-                        updateStatus();
-                    })
-                    .catch(err => {
-                        if (reqID === currentRequestID) $status.text("Error connecting to bot!");
-                        console.error(err);
-                    });
+                    makeBotMove();
                 }
             }
         });
